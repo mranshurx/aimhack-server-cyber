@@ -82,25 +82,29 @@ router.get('/verify', (req, res) => {
 });
 
 /* ------------------------------------------------------------------ *
- *  GET /api/get-config?key=KEY_NAME
- *  Happ subscription endpoint: plain text, metadata comments + JSON.
+ *  GET /api/get-config?key=KEY_NAME[&format=json|text|base64]
+ *
+ *  Default is application/json + pure JSON body, which is what Happ
+ *  auto-detects. Metadata (title / expiry) travels in HTTP headers.
  * ------------------------------------------------------------------ */
 
 router.get('/get-config', (req, res) => {
   const keyName = String(req.query.key || req.query.name || '').trim();
 
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Profile-Update-Interval', String(config.UPDATE_INTERVAL));
+  const plainErr = (status, msg) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(status).send(msg);
+  };
 
   if (!keyName) {
-    return res.status(400).send('# ERROR: missing ?key= parameter');
+    return plainErr(400, '# ERROR: missing ?key= parameter');
   }
 
   const record = keys.findKey(store.getKeys(), keyName);
 
   if (!record) {
-    return res.status(404).send(
+    return plainErr(
+      404,
       `# ERROR: invalid key "${keyName}" (store has ${store.count()} key(s))`
     );
   }
@@ -108,13 +112,16 @@ router.get('/get-config', (req, res) => {
   if (keys.isExpired(record)) {
     const strict = req.query.strict === '1' || req.query.strict === 'true';
     if (strict) {
-      return res.status(403).send(`# ERROR: key "${keyName}" expired`);
+      return plainErr(403, `# ERROR: key "${keyName}" expired`);
     }
-    // Otherwise still serve the config so Happ can render the expired state
-    // from the `expire=` value in the metadata header.
+    // Otherwise still serve so Happ renders the expired state from expire=
   }
 
-  return res.status(200).send(buildSubscription(keyName, record));
+  const { headers, body } = buildSubscription(keyName, record, req.query.format);
+
+  Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
+
+  return res.status(200).send(body);
 });
 
 module.exports = router;

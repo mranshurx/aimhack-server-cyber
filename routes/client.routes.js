@@ -100,7 +100,9 @@ router.get('/get-config', (req, res) => {
   const record = keys.findKey(store.getKeys(), keyName);
 
   if (!record) {
-    return res.status(404).send(`# ERROR: invalid key "${keyName}"`);
+    return res.status(404).send(
+      `# ERROR: invalid key "${keyName}" (store has ${store.count()} key(s))`
+    );
   }
 
   if (keys.isExpired(record)) {

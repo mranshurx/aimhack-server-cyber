@@ -13,11 +13,10 @@ function extractSecret(req) {
   );
 }
 
-/** Timing-safe comparison against the configured admin password. */
+/** Timing-safe comparison; hashing first hides the password length. */
 function checkPassword(supplied) {
-  const a = Buffer.from(String(supplied));
-  const b = Buffer.from(config.ADMIN_PASSWORD);
-  if (a.length !== b.length) return false;
+  const a = crypto.createHash('sha256').update(String(supplied)).digest();
+  const b = crypto.createHash('sha256').update(String(config.ADMIN_PASSWORD)).digest();
   return crypto.timingSafeEqual(a, b);
 }
 

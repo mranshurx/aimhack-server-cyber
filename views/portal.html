@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIMHACK — Get Your Config</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0b0f14;color:#d7e0ea;
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px;margin:0 auto;padding:28px 18px 60px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:26px}
+  .brand h1{font-size:20px;margin:0;letter-spacing:3px;color:#4ade80}
+  .brand span{font-size:11px;color:#5d738a;letter-spacing:1px}
+  .card{background:#101821;border:1px solid #1c2733;border-radius:14px;padding:20px;margin-bottom:16px}
+  h2{font-size:11px;margin:0 0 12px;letter-spacing:1.5px;color:#8ba3b8;text-transform:uppercase}
+  label{display:block;font-size:11px;color:#5d738a;margin-bottom:7px}
+  input{width:100%;font-family:inherit;font-size:15px;padding:14px;border-radius:9px;
+        border:1px solid #24313f;background:#0b1119;color:#d7e0ea;letter-spacing:1px}
+  input:focus{outline:none;border-color:#4ade80}
+  button{font-family:inherit;font-size:13px;font-weight:700;padding:13px 16px;border-radius:9px;
+         border:none;background:#4ade80;color:#04140a;cursor:pointer;width:100%;margin-top:12px}
+  button:hover{filter:brightness(1.08)}
+  button.sec{background:transparent;color:#8ba3b8;border:1px solid #24313f;margin-top:8px}
+  button.sec:hover{color:#d7e0ea;border-color:#3a4b5e;filter:none}
+  .status{display:flex;justify-content:space-between;align-items:center;
+          padding:13px 14px;border-radius:10px;margin-bottom:14px;font-size:12px;font-weight:700}
+  .status.active{background:#0d2f1c;color:#4ade80}
+  .status.expired{background:#3a1414;color:#f87171}
+  .kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #1a2531;font-size:12px}
+  .kv:last-child{border-bottom:none}
+  .kv span:first-child{color:#5d738a}
+  .kv span:last-child{color:#d7e0ea;text-align:right;word-break:break-all}
+  .urlbox{background:#0b1119;border:1px solid #24313f;border-radius:9px;padding:12px;
+          font-size:11px;word-break:break-all;color:#8ba3b8;line-height:1.6;margin-bottom:10px}
+  .qr{display:block;margin:0 auto 12px;background:#fff;padding:10px;border-radius:10px;
+      width:200px;height:200px}
+  .msg{padding:11px 13px;border-radius:9px;font-size:12px;margin-top:12px;display:none}
+  .msg.err{display:block;background:#3a1414;color:#f87171}
+  ol{margin:0;padding-left:20px;font-size:12px;color:#8ba3b8;line-height:1.9}
+  ol b{color:#d7e0ea}
+  .hide{display:none}
+  footer{text-align:center;font-size:11px;color:#3f5468;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand"><h1>AIMHACK</h1><span>FREE FIRE PROXY</span></div>
+
+  <div class="card">
+    <h2>Enter your license key</h2>
+    <label for="key">License key</label>
+    <input id="key" placeholder="AMHK-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+    <button onclick="lookup()">Get my config</button>
+    <div id="err" class="msg err"></div>
+  </div>
+
+  <div id="result" class="hide">
+
+    <div class="card">
+      <div id="statusBar" class="status"><span id="statusText"></span><span id="statusKey"></span></div>
+      <div class="kv"><span>Expires</span><span id="expires"></span></div>
+      <div class="kv"><span>Time left</span><span id="remaining"></span></div>
+      <div class="kv"><span>Traffic quota</span><span id="quota"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>Subscription link</h2>
+      <div class="urlbox" id="subUrl"></div>
+      <button onclick="copyUrl(event)">Copy link</button>
+      <button class="sec" onclick="openHapp()">Open in Happ</button>
+      <button class="sec" onclick="toggleQR()">Show QR code</button>
+      <div id="qrWrap" class="hide" style="margin-top:14px">
+        <img id="qr" class="qr" alt="QR code">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>How to import</h2>
+      <ol>
+        <li>Install <b>Happ</b> from the Play Store / App Store.</li>
+        <li>Tap <b>Open in Happ</b> above, or copy the link.</li>
+        <li>In Happ, go to <b>Subscriptions &rarr; Add &rarr; from clipboard</b>.</li>
+        <li>Update the subscription, then connect.</li>
+      </ol>
+    </div>
+
+  </div>
+
+  <footer>Powered by AIMHACK</footer>
+</div>
+
+<script>
+let current = null;
+const $ = (id) => document.getElementById(id);
+
+function fmtBytes(b) { return (b / (1024 * 1024 * 1024)).toFixed(1) + ' GB'; }
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function showErr(text) {
+  $('err').textContent = text;
+  $('err').style.display = 'block';
+  $('result').classList.add('hide');
+}
+
+async function lookup() {
+  const key = $('key').value.trim();
+  $('err').style.display = 'none';
+  if (!key) return showErr('Enter your license key first.');
+
+  try {
+    const res = await fetch('/api/portal/info?key=' + encodeURIComponent(key));
+    const data = await res.json();
+    if (!res.ok || !data.success) return showErr(data.error || 'Key not found.');
+    current = data;
+    render(data);
+  } catch (e) {
+    showErr('Could not reach the server.');
+  }
+}
+
+function render(data) {
+  $('result').classList.remove('hide');
+  $('qrWrap').classList.add('hide');
+
+  $('statusBar').className = 'status ' + data.status;
+  $('statusText').textContent = data.valid ? 'ACTIVE' : 'EXPIRED';
+  $('statusKey').textContent = data.key;
+
+  $('expires').textContent = fmtDate(data.expiresAtIso);
+  $('remaining').textContent = data.valid ? data.remainingHuman : '0d 0h 0m';
+  $('quota').textContent = fmtBytes(data.totalBytes);
+  $('subUrl').textContent = data.subscriptionUrl;
+
+  $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function copyUrl(ev) {
+  if (!current) return;
+  const btn = ev.target;
+  try {
+    await navigator.clipboard.writeText(current.subscriptionUrl);
+    const old = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = old; }, 1600);
+  } catch (e) {
+    prompt('Copy this link:', current.subscriptionUrl);
+  }
+}
+
+function openHapp() { if (current) window.location.href = current.happDeeplink; }
+
+function toggleQR() {
+  if (!current) return;
+  const wrap = $('qrWrap');
+  if (!wrap.classList.contains('hide')) return wrap.classList.add('hide');
+  $('qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data='
+    + encodeURIComponent(current.subscriptionUrl);
+  wrap.classList.remove('hide');
+}
+
+const prefill = new URLSearchParams(window.location.search).get('key');
+if (prefill) { $('key').value = prefill; lookup(); }
+
+$('key').addEventListener('keydown', (e) => { if (e.key === 'Enter') lookup(); });
+</script>
+</body>
+</html>

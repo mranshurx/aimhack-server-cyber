@@ -11,7 +11,8 @@
  *    lib/routing.js          routing tables
  *    lib/config-builder.js   Happ payload builder
  *    routes/*.routes.js      HTTP routes
- *    views/dashboard.html    admin UI
+ *    views/dashboard.html    admin UI   (served at /)
+ *    views/portal.html       client UI  (served at /portal)
  * ============================================================================
  */
 
@@ -22,6 +23,7 @@ const store = require('./lib/store');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const adminRoutes = require('./routes/admin.routes');
 const clientRoutes = require('./routes/client.routes');
+const portalRoutes = require('./routes/portal.routes');
 
 const app = express();
 
@@ -49,9 +51,10 @@ app.use((req, res, next) => {
  *  Routes
  * ------------------------------------------------------------------ */
 
-app.use('/api/admin', adminRoutes);
-app.use('/api', clientRoutes);
-app.use('/', dashboardRoutes);
+app.use('/api/admin', adminRoutes);   // admin API
+app.use('/', dashboardRoutes);        // admin dashboard UI at  /
+app.use('/api', clientRoutes);        // /api/verify, /api/get-config
+app.use('/', portalRoutes);           // client portal at /portal + /api/portal/info
 
 /* ------------------------------------------------------------------ *
  *  Fallbacks
@@ -78,7 +81,8 @@ const server = app.listen(config.PORT, config.HOST, () => {
   console.log('=========================================================');
   console.log('  AIMHACK license server');
   console.log(`  listening   : http://${config.HOST}:${config.PORT}`);
-  console.log(`  dashboard   : http://localhost:${config.PORT}/`);
+  console.log(`  admin panel : http://localhost:${config.PORT}/`);
+  console.log(`  client portal: http://localhost:${config.PORT}/portal`);
   console.log(`  keys file   : ${store.KEYS_FILE}`);
   console.log(`  remote node : hysteria2://${config.HYSTERIA.address}:${config.HYSTERIA.port}`);
   console.log('=========================================================');

@@ -4,7 +4,7 @@ const express = require('express');
 const config = require('../config');
 const store = require('../lib/store');
 const keys = require('../lib/key-utils');
-const { buildSubscription } = require('../lib/config-builder');
+const { buildSubscription, buildConfig } = require('../lib/config-builder');
 
 const router = express.Router();
 
@@ -28,10 +28,7 @@ router.post('/verify', (req, res) => {
 
   if (keys.isExpired(record)) {
     return res.json({
-      success: true,
-      valid: false,
-      status: 'expired',
-      key: keyName,
+      success: true, valid: false, status: 'expired', key: keyName,
       expiresAt: record.expiresAt,
       expireUnix: Math.floor(record.expiresAt / 1000),
       remainingMs: 0
@@ -39,10 +36,7 @@ router.post('/verify', (req, res) => {
   }
 
   return res.json({
-    success: true,
-    valid: true,
-    status: 'active',
-    key: keyName,
+    success: true, valid: true, status: 'active', key: keyName,
     expiresAt: record.expiresAt,
     expiresAtIso: new Date(record.expiresAt).toISOString(),
     expireUnix: Math.floor(record.expiresAt / 1000),
@@ -82,10 +76,12 @@ router.get('/verify', (req, res) => {
 });
 
 /* ------------------------------------------------------------------ *
- *  GET /api/get-config?key=KEY_NAME[&format=json|text|base64]
- *
- *  Default is application/json + pure JSON body, which is what Happ
- *  auto-detects. Metadata (title / expiry) travels in HTTP headers.
+ *  GET /api/get-config?key=KEY
+ *    (default)        -> application/json + Subscription-Userinfo + Routing
+ *    &raw=1           -> bare JSON config only
+ *    &debug=1         -> JSON dump of the exact headers being sent
+ *    &format=json|text|base64
+ *    &strict=1        -> 403 when expired
  * ------------------------------------------------------------------ */
 
 router.get('/get-config', (req, res) => {
@@ -109,18 +105,40 @@ router.get('/get-config', (req, res) => {
     );
   }
 
-  if (keys.isExpired(record)) {
-    const strict = req.query.strict === '1' || req.query.strict === 'true';
-    if (strict) {
-      return plainErr(403, `# ERROR: key "${keyName}" expired`);
-    }
-    // Otherwise still serve so Happ renders the expired state from expire=
+  const expired = keys.isExpired(record);
+  const strict = req.query.strict === '1' || req.query.strict === 'true';
+
+  if (expired && strict) {
+    return plainErr(403, `# ERROR: key "${keyName}" expired`);
+  }
+
+  // --- bare JSON (portal "Copy JSON" button) ---
+  if (req.query.raw === '1') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(JSON.stringify(buildConfig(keyName, record), null, 2));
   }
 
   const { headers, body } = buildSubscription(keyName, record, req.query.format);
 
-  Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
+  // --- debug: show exactly what Happ receives ---
+  if (req.query.debug === '1') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(200).json({
+      key: keyName,
+      storeKeys: store.count(),
+      expired,
+      contentType: headers['Content-Type'],
+      subscriptionUserinfo: headers['Subscription-Userinfo'],
+      routingHeaderLength: (headers['Routing'] || '').length,
+      routingHeaderPrefix: (headers['Routing'] || '').slice(0, 60),
+      allHeaderNames: Object.keys(headers),
+      bodyLength: body.length,
+      bodyStartsWith: body.slice(0, 40)
+    });
+  }
 
+  Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
   return res.status(200).send(body);
 });
 

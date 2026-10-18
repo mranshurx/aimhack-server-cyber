@@ -38,18 +38,27 @@ router.get('/api/portal/info', (req, res) => {
   const record = keys.findKey(store.getKeys(), keyName);
 
   if (!record) {
-    return res.status(404).json({ success: false, valid: false, error: 'Invalid key' });
+    return res.status(404).json({
+      success: false,
+      valid: false,
+      error: 'Invalid key',
+      storeKeys: store.count()
+    });
   }
 
   const expired = keys.isExpired(record);
   const remaining = expired ? 0 : record.expiresAt - keys.now();
-  const subUrl = `${baseUrl(req)}/api/get-config?key=${encodeURIComponent(keyName)}`;
+
+  // Use the resolved stored name so links work even when the user typed
+  // the auth credential instead of the key name.
+  const resolvedName = keys.resolveStoredName(store.getKeys(), keyName) || keyName;
+  const subUrl = `${baseUrl(req)}/api/get-config?key=${encodeURIComponent(resolvedName)}`;
 
   return res.json({
     success: true,
     valid: !expired,
     status: expired ? 'expired' : 'active',
-    key: keyName,
+    key: resolvedName,
     expiresAt: record.expiresAt,
     expiresAtIso: new Date(record.expiresAt).toISOString(),
     expireUnix: Math.floor(record.expiresAt / 1000),

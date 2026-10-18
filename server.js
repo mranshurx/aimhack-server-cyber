@@ -76,14 +76,18 @@ app.use((err, req, res, next) => {
  * ------------------------------------------------------------------ */
 
 store.load();
+store.seedFromEnv();   // optional: re-create keys on ephemeral hosts
 
 const server = app.listen(config.PORT, config.HOST, () => {
   console.log('=========================================================');
   console.log('  AIMHACK license server');
   console.log(`  listening   : http://${config.HOST}:${config.PORT}`);
+  console.log(`  public base : ${config.PUBLIC_BASE_URL || '(derived from Host header)'}`);
   console.log(`  admin panel : http://localhost:${config.PORT}/`);
   console.log(`  client portal: http://localhost:${config.PORT}/portal`);
+  console.log(`  data dir    : ${config.DATA_DIR}`);
   console.log(`  keys file   : ${store.KEYS_FILE}`);
+  console.log(`  keys loaded : ${store.count()}`);
   console.log(`  remote node : hysteria2://${config.HYSTERIA.address}:${config.HYSTERIA.port}`);
   console.log('=========================================================');
 });

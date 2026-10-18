@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIMHACK — License Panel</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#0b0f14;color:#d7e0ea}
+  header{padding:18px 22px;border-bottom:1px solid #1c2733;display:flex;gap:12px;align-items:center}
+  header h1{font-size:16px;margin:0;letter-spacing:2px;color:#4ade80}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px}
+  .card{background:#101821;border:1px solid #1c2733;border-radius:10px;padding:18px;margin-bottom:18px}
+  h2{font-size:13px;margin:0 0 14px;letter-spacing:1px;color:#8ba3b8;text-transform:uppercase}
+  input,button{font-family:inherit;font-size:13px;padding:9px 11px;border-radius:7px;border:1px solid #24313f;background:#0b1119;color:#d7e0ea}
+  input:focus{outline:none;border-color:#4ade80}
+  button{background:#4ade80;color:#04140a;border:none;cursor:pointer;font-weight:700}
+  button:hover{filter:brightness(1.1)}
+  button.ghost{background:transparent;color:#8ba3b8;border:1px solid #24313f}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #1a2531;vertical-align:middle}
+  th{color:#6b8299;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:1px}
+  .pill{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+  .active{background:#0d2f1c;color:#4ade80}
+  .expired{background:#3a1414;color:#f87171}
+  .mono{word-break:break-all}
+  .muted{color:#5d738a;font-size:11px}
+  .msg{padding:9px 12px;border-radius:7px;font-size:12px;margin-top:12px;display:none}
+  .msg.ok{display:block;background:#0d2f1c;color:#4ade80}
+  .msg.err{display:block;background:#3a1414;color:#f87171}
+</style>
+</head>
+<body>
+<header><h1>AIMHACK</h1><span class="muted">license control panel</span></header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>1 &middot; Admin login</h2>
+    <div class="row">
+      <input id="pw" type="password" placeholder="Admin password" style="flex:1;min-width:220px">
+      <button onclick="login()">Login</button>
+    </div>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 &middot; Create key</h2>
+    <div class="grid">
+      <input id="kkey" placeholder="key (blank = auto)">
+      <input id="kdays" type="number" min="0" placeholder="days" value="30">
+      <input id="khours" type="number" min="0" placeholder="hours" value="0">
+      <input id="kmins" type="number" min="0" placeholder="minutes" value="0">
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button onclick="createKey()">Create key</button>
+      <button class="ghost" onclick="loadKeys()">Refresh list</button>
+    </div>
+    <div id="createMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 &middot; Keys <span id="counter" class="muted"></span></h2>
+    <table>
+      <thead><tr><th>Key</th><th>Status</th><th>Expires</th><th>Remaining</th><th></th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="5" class="muted">login to load keys</td></tr></tbody>
+    </table>
+  </div>
+
+</div>
+<script>
+let token = sessionStorage.getItem('aimhack_token') || '';
+if (token) document.getElementById('pw').value = token;
+
+function msg(id, text, ok) {
+  const el = document.getElementById(id);
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+  if (ok) setTimeout(() => { el.className = 'msg'; }, 4000);
+}
+
+async function api(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign(
+    { 'Content-Type': 'application/json', 'x-admin-password': token },
+    opts.headers || {}
+  );
+  const res = await fetch(path, opts);
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+async function login() {
+  token = document.getElementById('pw').value;
+  try {
+    const data = await api('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: token })
+    });
+    token = data.token;
+    sessionStorage.setItem('aimhack_token', token);
+    msg('loginMsg', 'Authenticated', true);
+    loadKeys();
+  } catch (e) {
+    msg('loginMsg', e.message, false);
+  }
+}
+
+async function createKey() {
+  try {
+    const data = await api('/api/admin/create-key', {
+      method: 'POST',
+      body: JSON.stringify({
+        key: document.getElementById('kkey').value.trim() || undefined,
+        days: document.getElementById('kdays').value,
+        hours: document.getElementById('khours').value,
+        minutes: document.getElementById('kmins').value
+      })
+    });
+    msg('createMsg', data.message + ': ' + data.key + ' (expires ' + data.expiresAtIso + ')', true);
+    document.getElementById('kkey').value = '';
+    loadKeys();
+  } catch (e) {
+    msg('createMsg', e.message, false);
+  }
+}
+
+async function delKey(k) {
+  if (!confirm('Delete ' + k + '?')) return;
+  try {
+    await api('/api/admin/delete-key', { method: 'POST', body: JSON.stringify({ key: k }) });
+    loadKeys();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function loadKeys() {
+  if (!token) return;
+  try {
+    const data = await api('/api/admin/keys');
+    document.getElementById('counter').textContent =
+      '(' + data.active + ' active / ' + data.expired + ' expired)';
+
+    const tbody = document.getElementById('tbody');
+
+    if (!data.keys.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="muted">no keys yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.keys.map(function (k) {
+      return '<tr>' +
+        '<td class="mono">' + k.key + '</td>' +
+        '<td><span class="pill ' + k.status + '">' + k.status + '</span></td>' +
+        '<td class="muted">' + (k.expiresAtIso || '-') + '</td>' +
+        '<td class="muted">' + k.remainingHuman + '</td>' +
+        '<td><button class="ghost" onclick="delKey(\'' + k.key + '\')">del</button></td>' +
+      '</tr>';
+    }).join('');
+  } catch (e) {
+    document.getElementById('tbody').innerHTML =
+      '<tr><td colspan="5" class="muted">' + e.message + '</td></tr>';
+  }
+}
+</script>
+</body>
+</html>

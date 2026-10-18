@@ -7,10 +7,20 @@ module.exports = {
   HOST: process.env.HOST || '0.0.0.0',
   PORT: process.env.PORT || 10000,
 
+  /* ---------- public URL ---------- *
+   * Absolute base URL used to build subscription links.
+   * SET THIS IN PRODUCTION, e.g. https://aimhack-server.onrender.com
+   * If empty, links fall back to the request Host header.
+   */
+  PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || '',
+
   /* ---------- auth ---------- */
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'AimhackAdmin2026',
 
-  /* ---------- storage ---------- */
+  /* ---------- storage ---------- *
+   * Point DATA_DIR at a PERSISTENT disk in production, e.g. /var/data
+   * Otherwise keys.json is wiped on every deploy / restart.
+   */
   DATA_DIR: process.env.DATA_DIR || path.join(__dirname, 'data'),
   KEYS_FILE: 'keys.json',
 

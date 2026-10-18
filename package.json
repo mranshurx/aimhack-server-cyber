@@ -1,0 +1,17 @@
+{
+  "name": "aimhack-license-server",
+  "version": "1.0.0",
+  "description": "License key manager and dynamic Happ subscription server for AIMHACK",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
